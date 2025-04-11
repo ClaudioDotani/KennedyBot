@@ -1,7 +1,8 @@
 import os
 import wikipedia
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
+<<<<<<< Updated upstream
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
 from langchain_chroma import Chroma
@@ -15,6 +16,26 @@ document_directory = os.getenv("DOCUMENTS_DIRECTORY")
 db_directory = os.getenv("DB_DIRECTORY")
 
 
+=======
+from langchain_chroma import Chroma  # Per il database vettoriale Chroma
+from langchain.docstore.document import Document  # Per creare documenti personalizzati
+from langchain_ollama import OllamaEmbeddings
+
+from dotenv import load_dotenv
+load_dotenv()
+pdf_directory = os.getenv("PDF_DIRECTORY") 
+persist_directory = os.getenv("PERSISTENT_DIRECTORY")
+model_embeddings = os.getenv("MODEL_EMBEDDING")
+
+embeddings = OllamaEmbeddings(
+    model = model_embeddings
+)
+
+vector_db = Chroma(
+    embedding_function=embeddings,
+    persist_directory=persist_directory
+)
+>>>>>>> Stashed changes
 
 def load_pdf_documents(pdf_directory):
     """Carica tutti i documenti PDF dalla directory specificata."""
@@ -48,7 +69,7 @@ def load_wikipedia_pages(page_titles):
 
 def main():
     # 1. Carica documenti PDF
-    pdf_directory = "documenti"  # modifica questo percorso secondo le tue esigenze
+     # modifica questo percorso secondo le tue esigenze
     pdf_documents = load_pdf_documents(pdf_directory)
 
     # 2. Carica pagine da Wikipedia
@@ -68,12 +89,9 @@ def main():
     docs_chunks = text_splitter.split_documents(documents)
     print(f"Documento suddiviso in {len(docs_chunks)} chunk.")
 
- 
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     # 6. Ingerisci i chunk nel database Chroma (persistente)
-    persist_directory = "./chroma_db"
-    Chroma.from_documents(docs_chunks, embeddings, persist_directory=persist_directory)
+    vector_db.add_documents(docs_chunks)
     print("Database Chroma creato/aggiornato con successo.")
 
    
