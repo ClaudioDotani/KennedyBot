@@ -2,9 +2,19 @@ import os
 import wikipedia
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.docstore.document import Document  # Per creare documenti personalizzati
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama.llms import OllamaLLM
+from langchain_chroma import Chroma
+from langchain.docstore.document import Document 
+from dotenv import load_dotenv
+
+load_dotenv()
+modelloLLM = os.getenv("LLM_MODEL")
+modello_embeddings= os.getenv("EMBEDDINGs_MODEL")
+document_directory = os.getenv("DOCUMENTS_DIRECTORY")
+db_directory = os.getenv("DB_DIRECTORY")
+
+
 
 def load_pdf_documents(pdf_directory):
     """Carica tutti i documenti PDF dalla directory specificata."""
