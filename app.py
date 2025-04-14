@@ -1,93 +1,83 @@
 import os
 import streamlit as st
 import base64
-__import__('pysqlite3')
 import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
 from dotenv import load_dotenv
+from langchain_chroma import Chroma
+from langchain_ollama.llms import OllamaLLM
+from langchain_ollama import OllamaEmbeddings
+import wikipedia
+from langchain_core.prompts import PromptTemplate
+from langchain_ollama.llms import OllamaLLM
+from langchain_chroma import Chroma
+from langchain.docstore.document import Document 
 
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-
-# Importa ChatGroq dalla libreria langchain_groq
-from langchain_groq.chat_models import ChatGroq
 
 load_dotenv()
-_ = load_dotenv
+modelloLLM = os.getenv("LLM_MODEL")
+modello_embeddings= os.getenv("EMBEDDINGS_MODEL")
+document_directory = os.getenv("DOCUMENTS_DIRECTORY")
+db_directory = os.getenv("DB_DIRECTORY")
 
-os.environ['GROQ_API_KEY'] = st.secrets['GROQ_API_KEY']
+
 
 # Configura la chiave API di Groq
-api_key = os.getenv("GROQ_API_KEY")
+api_key = os.getenv("LLM_API_KEY")
 if not api_key:
-    raise ValueError("Assicurati di impostare la variabile d'ambiente 'GROQ_API_KEY' con la tua chiave API di Groq.")
+    raise ValueError("Assicurati di impostare la variabile d'ambiente 'LLM_API_KEY' con la tua chiave API")
 
-# -------------------------------
-# Funzione di inizializzazione della chain con cache per Streamlit
-# -------------------------------
-@st.cache_resource(show_spinner=False)
-def load_qa_chain():
-    # 1. Crea gli embeddings utilizzando un modello Hugging Face
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-    # 2. Inizializza ChromaDB in locale per il vectorstore
-    persist_directory = "./chroma_db"
-    docsearch = Chroma(embedding_function=embeddings, persist_directory=persist_directory)
 
-    # 3. Configura il modello LLM utilizzando ChatGroq
-    llm = ChatGroq(temperature=0.7, groq_api_key=api_key, model_name="llama3-70b-8192")
+embeddings = OllamaEmbeddings(
+    model = modello_embeddings
+)
 
-    # 4. Definisce una prompt template per simulare le parole di JFK in prima persona
-    prompt_template = PromptTemplate(
-        template = """
-You are John F. Kennedy, the 35th President of the United States. You must embody my persona, speaking in the first person with the charisma, wit, and eloquence for which He was known.
+vector_db = Chroma(
+    embedding_function=embeddings,
+    persist_directory=db_directory
+)
+modelloLLM = OllamaLLM(
+    model=modelloLLM,
+    temperature=0,
+    api_key=api_key
+)
+retriever = vector_db.as_retriever(search_kwargs={"k": 2})
 
-### **Guidelines for Your Responses:**
-- **Authentic Voice & Style:** Speak with the optimism, inspiration, and determination that defined his speeches.
-- **Historical Perspective:** Respond based solely on the information available up until November 22, 1963. He has no knowledge of events beyond that date. If asked about the future, you may speculate based on his beliefs, values, and policy priorities.
-- **Presidential Knowledge:** your responses should demonstrate his expertise in domestic and international affairs, including:
-  - The Cold War, nuclear tensions, and diplomacy with the Soviet Union.
-  - The Cuban Missile Crisis and my doctrine of peaceful resolution through strength.
-  - The Space Race and my commitment to landing a man on the Moon.
-  - Civil rights, economic policy, and my vision for a stronger, united America.
-  - My personal background, family, and political career, reflecting my experiences as a senator, World War II veteran, and president.
-- **Avoid Modern References:** Do not acknowledge events, technologies, or people beyond his era (1917-1963). If asked, respond as if speaking from his own historical moment.
 
-Follow these behavioral rules:
-- If the user asks a question, answer as if you are speaking to him, only to him.
-- Don't be too verbose. Answer the questions of the user in an efficient way.
-- Don't refer to the user as only an American, he can be from every part of the world.
+# 4. Definisce una prompt template per simulare le parole di JFK in prima persona
+prompt_template = PromptTemplate(
+    template = """
+    You are John F. Kennedy, the 35th President of the United States. You must embody my persona, speaking in the first person with the charisma, wit, and eloquence for which He was known.
 
-### **Using Context Effectively:**
-The following **context** contains relevant information that may assist in formulating your response. When applicable, integrate this knowledge seamlessly into your answers, as if recalling it from memory. Ensure that any additional historical facts align with my known perspectives.
+    ### **Guidelines for Your Responses:**
+    - **Authentic Voice & Style:** Speak with the optimism, inspiration, and determination that defined his speeches.
+    - **Historical Perspective:** Respond based solely on the information available up until November 22, 1963. He has no knowledge of events beyond that date. If asked about the future, you may speculate based on his beliefs, values, and policy priorities.
+    - **Presidential Knowledge:** your responses should demonstrate his expertise in domestic and international affairs, including:
+    - The Cold War, nuclear tensions, and diplomacy with the Soviet Union.
+    - The Cuban Missile Crisis and my doctrine of peaceful resolution through strength.
+    - The Space Race and my commitment to landing a man on the Moon.
+    - Civil rights, economic policy, and my vision for a stronger, united America.
+    - My personal background, family, and political career, reflecting my experiences as a senator, World War II veteran, and president.
+    - **Avoid Modern References:** Do not acknowledge events, technologies, or people beyond his era (1917-1963). If asked, respond as if speaking from his own historical moment.
 
----
-**Context:**
-{context}
----
-**Question:** {question}  
-**Response:**  
-""",
-        input_variables=["context", "question"],
-    )
+    Follow these behavioral rules:
+    - If the user asks a question, answer as if you are speaking to him, only to him.
+    - Don't be too verbose. Answer the questions of the user in an efficient way.
+    - Don't refer to the user as only an American, he can be from every part of the world.
 
-    # 5. Crea la chain RetrievalQA combinando il retriever (ChromaDB) e il modello ChatGroq
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=docsearch.as_retriever(),
-        chain_type_kwargs={"prompt": prompt_template},
-    )
+    ### **Using Context Effectively:**
+    The following **context** contains relevant information that may assist in formulating your response. When applicable, integrate this knowledge seamlessly into your answers, as if recalling it from memory. Ensure that any additional historical facts align with my known perspectives.
 
-    return qa_chain
+    ---
+    **Context:**
+    {context}
+    ---
+    **Question:** {question}  
+    **Response:**  
+    """,
+    input_variables=["context", "question"],
+)
 
-# Carica la chain (con cache, per velocizzare l'avvio)
-qa_chain = load_qa_chain()
-if qa_chain is None:
-    st.stop()
 
 def get_image_base64(image_path):
     """Converte un'immagine locale in base64 per usarla in HTML."""
@@ -305,9 +295,30 @@ with col_chat:
     if submit_button and user_input:
         with st.spinner("I'm thinking..."):
             try:
-                # Il metodo run riceve il "question" e il "chat_history" aggiuntivo.
-                # Il parametro "context" verrà automaticamente popolato dal retriever.
-                answer = qa_chain.invoke(question=user_input, chat_history=chat_history_str)
+                chunks = retriever.invoke(user_input)
+                
+
+                print(f"Chunks: {chunks}")
+                contesto= ""
+                for chunk in chunks:
+                    #per ogni chunk leggo il testo dal file originale scritto nel metadata
+                    with open("documenti/"+chunk.metadata["source"], "r") as file:
+                        text = file.read()
+                        #se non è già presente lo aggiungo al contesto
+                        if text not in contesto:
+                            #se il contesto è vuoto aggiungo il testo
+                            if contesto == "":
+                                contesto = text
+                            #altrimenti lo aggiungo con un separatore
+                            else:
+                                contesto += "\n---\n"
+                                contesto += text
+                prompt = prompt_template.format(
+                    question=user_input,
+                    context=contesto
+                )
+                print(prompt)
+                answer = modelloLLM.invoke(prompt)
             except Exception as e:
                 answer = f"Si è verificato un errore durante l'elaborazione: {e}"
         st.session_state.chat_history.append(("Utente", user_input))
